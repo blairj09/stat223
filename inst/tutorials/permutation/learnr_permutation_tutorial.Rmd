@@ -82,6 +82,7 @@ tableOutput("data_table")
 
 ```{r, context = 'server'}
 waiting <- faithful$waiting
+n <- length(waiting)
 observed <- cor(waiting[-1], waiting[-n])
 
 permute_samples <- eventReactive(input$run_permutations, {
@@ -294,7 +295,7 @@ The economist wishes to test the null hypothesis that median income of younger b
 obs <- median(brothers[["older"]]) - median(brothers[["younger"]])
 
 # Permutation samples
-n_samples <- 1000
+n_samples <- 10000
 
 # Function to get single median difference
 get_median_diff <- function() {
@@ -312,8 +313,10 @@ plot(density(sample_diff))
 abline(v = obs, col = "red")
 
 # P value
+p_value <- mean(abs(sample_diff) >= abs(obs))
 
 # Confidence interval
+p_value + c(-1, 1) * sqrt(p_value * (1-p_value) / n_samples)
 ```
 
 ### Tidyverse
