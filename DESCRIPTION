@@ -1,0 +1,15 @@
+Package: stat223
+Type: Package
+Title: BYU Stat 223 Lectures and Tutorials
+Version: 0.0.0.9999
+Author: James Blair
+Maintainer: James Blair <james.m.blair09@gmail.com>
+Description: This package contains learnr tutorials used to teach BYU Stat 223.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    learnr,
+    tidyverse,
+    shiny
+RoxygenNote: 6.0.1

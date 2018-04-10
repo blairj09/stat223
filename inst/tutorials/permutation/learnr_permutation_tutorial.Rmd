@@ -1,0 +1,377 @@
+---
+title: "Permutation Test"
+author: James Blair, David Dahl
+output: 
+  learnr::tutorial:
+    theme: rstudio
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+# Packages ----
+library(learnr)
+library(tidyverse)
+library(stat223)
+
+# Knitr options ----
+knitr::opts_chunk$set(
+  echo = FALSE, 
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## Introduction
+
+The [permutation test](https://en.wikipedia.org/wiki/Resampling_(statistics)#Permutation_tests) is a non-parametric test that essentially allows you to create a sample distribution for any test statistic. This non-parametric test is useful when sample sizes are small and does not rely on distributional assumptions. Similar to bootstrapping, permutation tests rely on sampling data. However, unlike bootstrap, in a permutation test the data is sampled *without replacement*.
+
+A complete permutation test would involve considering all possible combinations of data and labels (outcomes). This quickly becomes computational expensive as the number of combinations increases. Instead of considering all combinatations, a sample of combinations can be used to calculate an approximate permutation test.
+
+A permutation test can be broken down into the following steps:
+
+1. Stating the hypotheses - the null hypothesis for a permutation test takes some form of "there is no difference"
+2. Calculate the observed test statistic
+3. Shuffle the data and recalculate the test statistic with the new data
+4. Repeat step 3 many times to build a collection of test statistic values under various combinations of the data
+5. Compare the observed test statistic to the test statistics generated from the shuffled samples
+6. Calculate significance based on this comparison
+
+## Demonstration
+
+### Old Faithful
+
+R includes a built-in dataset about Old Faithful that can be accessed by typing `faithful`. This dataset contains `r nrow(faithful)` observations of two columns: `eruptions` measures the eruption time of an eruption in minutes and `waiting` measures the number of minutes until the next eruption. In this example, we want to know if the waiting times between eruptions of Old Faithful are autocorrelated.
+
+$H_0$: No correlation
+
+$H_A$: Correlation
+
+We'll use a permutation test to determine if there's a significant correlation in time between eruptions.
+
+First we need some measure of correlation between wait times.
+
+```{r correlation, exercise = TRUE, exercise.eval = TRUE}
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+observed <- acf(waiting, plot = FALSE)$acf[2]
+observed
+```
+
+### Permutations
+
+In this case, permuting the data is simply a matter of sampling the data without replacement and then calculating the correlation. Essentially, we're posing the question: *does order matter?*
+
+In order to test our hypothesis, we need some sort of distribution to compare to what we've observed. We generate this distribution by randomly shuffling the data, calculating the correlation, and repeating several times. This gives us a distribution of correlation values that we can compare against our observed value.
+
+```{r}
+waiting <- faithful$waiting
+
+textInput(
+  "n_permutations",
+  label = "# Permutations",
+  value = 1
+)
+actionButton(
+  inputId = "run_permutations",
+  label = "Generate"
+)
+
+plotOutput("distribution_plot")
+h4("Shuffled Data")
+tableOutput("data_table")
+```
+
+```{r, context = 'server'}
+# TODO: Add animation
+# TODO: Preview of data - show what's happening to data
+permute_samples <- eventReactive(input$run_permutations, {
+  validate(
+    need(!is.na(as.numeric(input$n_permutations)), "Input must be numeric!")
+  )
+  validate(
+    need(as.numeric(input$n_permutations) >= 1, "Input must be >= 1"),
+    need(as.numeric(input$n_permutations) <= 1000, "Input must be <= 1000")
+  )
+  tibble(
+    data = map(1:as.numeric(input$n_permutations), ~sample(waiting)),
+    corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
+  )
+}, ignoreInit = FALSE)
+
+output$distribution_plot <- renderPlot({
+  permute_samples() %>% 
+    ggplot(aes(x = corr)) +
+    geom_vline(
+      xintercept = observed,
+      color = "red"
+    ) +
+    geom_histogram() +
+    theme_bw()
+})
+
+output$data_table <- renderTable({
+  permute_samples() %>% 
+    head(10) %>% 
+    unnest() %>% 
+    mutate(obs = rep(1:272, min(10, input$n_permutations))) %>% 
+    spread(key = obs, value = data) %>% 
+    select(1:11)
+})
+```
+
+## How to
+
+As with everything in R, there are multiple ways a permutation test like we just observed can be done. One way is to use a for loop to generate each permutation of the data and calculate the necessary statistic.
+
+### Loops
+
+```{r for-loop, exercise = TRUE}
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr <- numeric(n_samples)
+for (i in seq_len(n_samples)) {
+  new_data <- sample(waiting)
+  sample_corr[i] <- acf(new_data, plot = FALSE)$acf[2]
+}
+
+sample_corr
+```
+
+However, it's generally good practice to avoid for loops in R since they're notoriously slow and require lots of boilerplate code.
+
+### Replicate
+
+The `apply` functions provide convenient methods of looping through multiple values and performing a set function on each iteration. As described in the documentation, `replicate` is a wrapper for the common use of `sapply` for repeated evaluation of an expression (which will usually involve random number generation). In this case, we don't care about the value of `i`, we just want to run the same thing `n_samples` times.
+
+```{r sapply, exercise = TRUE}
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr <- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])
+
+sample_corr
+```
+
+### Purrr
+
+The [`purrr`](http://purrr.tidyverse.org) package is part of the [tidyverse](http://tidyverse.org) and provides tools for improved functional programming in R. It's a very opinionated way of doing things, but it's one that I find intuitive and simple to grasp. However, it may not be for everyone. It most closely maps to the `apply` functions, although there are some very key and intentional differences that go beyond the scope of this lesson.
+
+In this example, we'll not only generate the sample statistic for each permuted sample, but we'll also easily and conveniently bring the permuted data along for the ride. When using packages in the tidyverse, nearly everything takes place in rectangular data (think `data.frame` or spreadsheet). In thise case, we'll create a `tibble` (special instance of a `data.frame`) to contain everything we need.
+
+```{r purrr, exercise = TRUE}
+library(tidyverse)
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr_tbl <- tibble(
+  n = seq_len(n_samples),
+  data = map(n, ~sample(waiting)),
+  corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
+)
+
+head(sample_corr_tbl)
+```
+
+### Plot
+Now that we have a sample distribution, we can plot it and compare the observed value to the distribution.
+
+#### Base
+Create a plot of the sample distribution using base graphics.
+```{r base-plot, exercise = TRUE}
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr <- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])
+```
+
+#### ggplot
+Create a plot of the sample distribution using ggplot2.
+```{r ggplot2-plot, exercise = TRUE}
+library(tidyverse)
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr_tbl <- tibble(
+  n = seq_len(n_samples),
+  data = map(n, ~sample(waiting)),
+  corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
+)
+```
+
+### Significance
+Now that we've visually inspected the results of the permutations, it *appears* that there is a significant difference. However, in order to be sure we can calculate a p-value and confidence interval.
+
+#### P value
+In this case, the p value is simply the proportion of observed values more extreme than our observed correlation.
+
+```{r p-value, exercise = TRUE}
+library(tidyverse)
+
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr <- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])
+sample_corr_tbl <- tibble(
+  n = seq_len(n_samples),
+  data = map(n, ~sample(waiting)),
+  corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
+)
+
+# Base
+p_value <- mean(abs(sample_corr) >= abs(observed))
+
+# Tidyverse
+sample_corr_tbl %>% 
+  summarise(p_value = mean(abs(corr) >= abs(observed)))
+```
+
+#### Confidence Interval
+Since we performed a partial permutation test (we didn't calculate all possible test statistic values under the null hypothesis) we can build a confidence interval around the p-value we obtained.
+
+$$
+\hat{p} \pm Z\sqrt{\frac{\hat{p}(1-\hat{p})}{n}}
+$$
+
+```{r confidence-interval, exercise = TRUE}
+library(tidyverse)
+
+waiting <- faithful$waiting
+n <- length(waiting)
+observed <- cor(waiting[-1], waiting[-n])
+set.seed(35749)
+n_samples <- 1000
+
+sample_corr <- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])
+sample_corr_tbl <- tibble(
+  n = seq_len(n_samples),
+  data = map(n, ~sample(waiting)),
+  corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
+)
+
+# Base
+p_value + c(-1, 1) * qnorm(0.975) * sqrt(p_value * (1 - p_value)/n_samples)
+
+# Tidyverse
+sample_corr_tbl %>% 
+  summarise(p_value = mean(abs(corr) >= abs(observed)),
+            interval = qnorm(0.975) * sqrt(p_value * (1 - p_value)/n_samples),
+            upper = p_value + interval,
+            lower = p_value - interval)
+```
+
+## Brothers Example
+Suppose that a labor economist is interested in the effect of birth order on earnings of brothers. Of course, the economist recognizes that families can vary widely in their background, opportunities, income, etc. To account for this, data is collected in pairs: Among U.S. families with two or more adult sons, 14 families are randomly selected and the earnings of each brother at age 25 is recorded. After correcting for inflation, the following data is obtained (in thousands of dollars):
+
+```{r brothers-data}
+brothers
+```
+
+The economist wishes to test the null hypothesis that median income of younger brothers is the same as that of older brothers. The alternative hypothesis is the median income of younger brothers is greater than that of older brothers.
+
+### Base R
+```{r brothers-base, exercise = TRUE}
+# Observed test statistic
+obs <- median(brothers[["older"]]) - median(brothers[["younger"]])
+
+# Permutation samples
+n_samples <- 1000
+
+# Function to get single median difference
+get_median_diff <- function() {
+  new_data <- t(apply(brothers, 1, sample))
+  diff <- median(new_data[,1]) - median(new_data[,2])
+  diff
+}
+
+# Permutation test - shuffle younger and older for each row
+sample_diff <- replicate(n_samples,
+                         get_median_diff())
+
+# Visualize distribution and observed measure
+plot(density(sample_diff))
+abline(v = obs, col = "red")
+
+# P value
+
+# Confidence interval
+```
+
+### Tidyverse
+```{r brothers-tidyverse, exercise = TRUE}
+library(tidyverse)
+
+# Observed test statistic
+obs <- median(brothers[["older"]]) - median(brothers[["younger"]])
+
+# Permutation samples
+n_samples <- 1000
+
+# Function to get single median difference
+get_median_diff <- function() {
+  new_data <- t(apply(brothers, 1, sample))
+  diff <- median(new_data[,1]) - median(new_data[,2])
+  diff
+}
+
+sample_diff_tbl <- tibble(
+  n = seq_len(n_samples),
+  diff = map_dbl(n, ~get_median_diff())
+)
+
+# Visualize
+sample_diff_tbl %>% 
+  ggplot(aes(x = diff)) +
+  geom_density() +
+  geom_vline(xintercept = obs, col = "red") +
+  theme_bw()
+
+# P value
+
+# Confidence interval
+```
+
+## GPA Practice
+The `gpa` dataset contains a observations of SAT scores (`sat`), High School GPA (`hsgpa`), and college GPA (`cgpa`). We want to know if there is a significant correlation between High School GPA and college GPA. Use a permutation test to determine if correlation is significant and calculate a 95% monte carlo confidence interval around the p-value.
+
+$H_0$: No correlation between High School GPA and college GPA
+$H_A$: Correlation between High School GPA and college GPA
+
+```{r gpa-practice, exercise = TRUE}
+gpa
+
+# Calculate the observed test statistic
+
+# Calculate test statistics based on resampled data (permutations)
+
+# Calculate two-sided p-value based on observed test statistic and the test 
+# statistic distribution
+
+# Build a 95% confidence interval around the p-value
+```
+
+<div id="gpa-practice-hint">
+**Hint:** Take a look at the `cor` function.
+</div>
+
+## HW
+[HW 6](https://dahl.byu.edu/223/2018a2/hw6/index.html) is assigned.
