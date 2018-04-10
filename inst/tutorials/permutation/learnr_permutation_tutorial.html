@@ -104,7 +104,9 @@ sample_corr &lt;- numeric(n_samples)
 for (i in seq_len(n_samples)) {
   new_data &lt;- sample(waiting)
   sample_corr[i] &lt;- acf(new_data, plot = FALSE)$acf[2]
-}</code></pre>
+}
+
+sample_corr</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
 </div>
 <p>However, it’s generally good practice to avoid for loops in R since they’re notoriously slow and require lots of boilerplate code.</p>
@@ -119,13 +121,15 @@ observed &lt;- cor(waiting[-1], waiting[-n])
 set.seed(35749)
 n_samples &lt;- 1000
 
-sample_corr &lt;- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])</code></pre>
+sample_corr &lt;- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])
+
+sample_corr</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
 </div>
 </div>
 <div id="section-purrr" class="section level3">
 <h3>Purrr</h3>
-<p>The <code>purrr</code> package is part of the tidyverse and provides tools for improved functional programming in R. It’s a very opinionated way of doing things, but it’s one that I find intuitive and simple to grasp. However, it may not be for everyone. It most closely maps to the <code>apply</code> functions, although there are some very key and intentional differences that go beyond the scope of this tutorial.</p>
+<p>The <a href="http://purrr.tidyverse.org"><code>purrr</code></a> package is part of the <a href="http://tidyverse.org">tidyverse</a> and provides tools for improved functional programming in R. It’s a very opinionated way of doing things, but it’s one that I find intuitive and simple to grasp. However, it may not be for everyone. It most closely maps to the <code>apply</code> functions, although there are some very key and intentional differences that go beyond the scope of this lesson.</p>
 <p>In this example, we’ll not only generate the sample statistic for each permuted sample, but we’ll also easily and conveniently bring the permuted data along for the ride. When using packages in the tidyverse, nearly everything takes place in rectangular data (think <code>data.frame</code> or spreadsheet). In thise case, we’ll create a <code>tibble</code> (special instance of a <code>data.frame</code>) to contain everything we need.</p>
 <div class="tutorial-exercise" data-label="purrr" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
 <pre class="text"><code>library(tidyverse)
@@ -139,7 +143,9 @@ sample_corr_tbl &lt;- tibble(
   n = seq_len(n_samples),
   data = map(n, ~sample(waiting)),
   corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
-)</code></pre>
+)
+
+head(sample_corr_tbl)</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
 </div>
 </div>
@@ -164,13 +170,18 @@ sample_corr &lt;- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2]
 <h4>ggplot</h4>
 Create a plot of the sample distribution using ggplot2.
 <div class="tutorial-exercise" data-label="ggplot2-plot" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
-<pre class="text"><code>waiting &lt;- faithful$waiting
+<pre class="text"><code>library(tidyverse)
+waiting &lt;- faithful$waiting
 n &lt;- length(waiting)
 observed &lt;- cor(waiting[-1], waiting[-n])
 set.seed(35749)
 n_samples &lt;- 1000
 
-sample_corr &lt;- replicate(n_samples, acf(sample(waiting), plot = FALSE)$acf[2])</code></pre>
+sample_corr_tbl &lt;- tibble(
+  n = seq_len(n_samples),
+  data = map(n, ~sample(waiting)),
+  corr = map_dbl(data, ~acf(., plot = FALSE)$acf[2])
+)</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
 </div>
 </div>
@@ -251,6 +262,8 @@ sample_corr_tbl %&gt;%
   </script>
 </div>
 <p>The economist wishes to test the null hypothesis that median income of younger brothers is the same as that of older brothers. The alternative hypothesis is the median income of younger brothers is greater than that of older brothers.</p>
+<div id="section-base-r" class="section level3">
+<h3>Base R</h3>
 <div class="tutorial-exercise" data-label="brothers-base" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
 <pre class="text"><code># Observed test statistic
 obs &lt;- median(brothers[[&quot;older&quot;]]) - median(brothers[[&quot;younger&quot;]])
@@ -278,6 +291,9 @@ abline(v = obs, col = &quot;red&quot;)
 # Confidence interval</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
 </div>
+</div>
+<div id="section-tidyverse" class="section level3">
+<h3>Tidyverse</h3>
 <div class="tutorial-exercise" data-label="brothers-tidyverse" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
 <pre class="text"><code>library(tidyverse)
 
@@ -310,6 +326,7 @@ sample_diff_tbl %&gt;%
 
 # Confidence interval</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
 </div>
 </div>
 <div id="section-gpa-practice" class="section level2">
@@ -362,8 +379,9 @@ output$`tutorial-exercise-correlation-output` <- renderUI({
 </script>
  
 <script type="application/shiny-prerendered" data-context="server">
-# TODO: Add animation
-# TODO: Preview of data - show what's happening to data
+waiting <- faithful$waiting
+observed <- cor(waiting[-1], waiting[-n])
+
 permute_samples <- eventReactive(input$run_permutations, {
   validate(
     need(!is.na(as.numeric(input$n_permutations)), "Input must be numeric!")
@@ -395,7 +413,7 @@ output$data_table <- renderTable({
     unnest() %>% 
     mutate(obs = rep(1:272, min(10, input$n_permutations))) %>% 
     spread(key = obs, value = data) %>% 
-    select(1:7)
+    select(1:11)
 })
 </script>
  
