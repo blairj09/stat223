@@ -65,8 +65,6 @@ In this case, permuting the data is simply a matter of sampling the data without
 In order to test our hypothesis, we need some sort of distribution to compare to what we've observed. We generate this distribution by randomly shuffling the data, calculating the correlation, and repeating several times. This gives us a distribution of correlation values that we can compare against our observed value.
 
 ```{r}
-waiting <- faithful$waiting
-
 textInput(
   "n_permutations",
   label = "# Permutations",
@@ -83,8 +81,8 @@ tableOutput("data_table")
 ```
 
 ```{r, context = 'server'}
-# TODO: Add animation
-# TODO: Preview of data - show what's happening to data
+waiting <- faithful$waiting
+
 permute_samples <- eventReactive(input$run_permutations, {
   validate(
     need(!is.na(as.numeric(input$n_permutations)), "Input must be numeric!")
