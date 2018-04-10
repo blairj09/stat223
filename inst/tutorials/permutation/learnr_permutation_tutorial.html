@@ -380,10 +380,7 @@ output$`tutorial-exercise-correlation-output` <- renderUI({
  
 <script type="application/shiny-prerendered" data-context="server">
 waiting <- faithful$waiting
-<<<<<<< HEAD
 observed <- cor(waiting[-1], waiting[-n])
-=======
->>>>>>> 243b79ca69f3d335419446c4e630d073999d61fb
 
 permute_samples <- eventReactive(input$run_permutations, {
   validate(
@@ -412,11 +409,12 @@ output$distribution_plot <- renderPlot({
 
 output$data_table <- renderTable({
   permute_samples() %>% 
-    head(10) %>% 
     unnest() %>% 
-    mutate(obs = rep(1:272, min(10, input$n_permutations))) %>% 
+    mutate(obs = rep(1:272, n()/272)) %>% 
     spread(key = obs, value = data) %>% 
-    select(1:11)
+    select(1:11) %>% 
+    mutate(n = 1:n()) %>% 
+    select(n, everything())
 })
 </script>
  
