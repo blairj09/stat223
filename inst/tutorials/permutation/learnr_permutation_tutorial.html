@@ -380,7 +380,10 @@ output$`tutorial-exercise-correlation-output` <- renderUI({
  
 <script type="application/shiny-prerendered" data-context="server">
 waiting <- faithful$waiting
+<<<<<<< HEAD
 observed <- cor(waiting[-1], waiting[-n])
+=======
+>>>>>>> 243b79ca69f3d335419446c4e630d073999d61fb
 
 permute_samples <- eventReactive(input$run_permutations, {
   validate(
